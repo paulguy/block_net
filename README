@@ -1,0 +1,32 @@
+block_net libc connect() wrapper
+
+Uses LD_PRELOAD to wrap connect() to prevent access to the internet.  Access is
+allowed to 127.0.0.0/8 and all other services but IPv4 are passed straight
+through.  (I don't have any IPv6 support where I am now so I have no real way
+to develop this.)  Additionally, dlsym() is wrapped to prevent a process
+bypassing the dynamic linker for libc.  (Fixes Wine)
+
+USAGE: ./block_net_run.sh <program> [arguments]
+You can use the block_net_run.sh script, passing your program and arguments to
+it, or you can set LD_PRELOAD yourself with:
+
+export LD_PRELOAD=/path/to/block_net/\$LIB/block_net.so
+
+To get a fully blocked shell.  The $LIB is necessary for multilib environments;
+make sure the $ is escaped so it's parsed by ld.so and not the shell.  You can
+select lib32 or lib64 specifically if you only want it to affect one or the
+other, or your system only has support for one of them.
+
+Problems:
+If a process uses dlvsym() directly to get the pointer to connect(), it will
+bypass LD_PRELOAD and the dlsym() protection.  If anyone has any hints to a
+solution for this, I would like to know.
+
+ncurses programs may get a screwed up terminal at times, you can get around
+this by setting BN_SILENT in your environment, value doesn't matter.  The
+tradeoff is this reduces stealth.
+
+A process may be able to unset or detect the presence of LD_PRELOAD to
+circumvent this library.  Again, hints on this would be helpful.
+
+Not endian-safe (little-endian only).  Might fix if there's demand for it.
