@@ -4,7 +4,11 @@ Uses LD_PRELOAD to wrap connect() to prevent access to the internet.  Access is
 allowed to 127.0.0.0/8 and all other services but IPv4 are passed straight
 through.  (I don't have any IPv6 support where I am now so I have no real way
 to develop this.)  Additionally, dlsym() is wrapped to prevent a process
-bypassing the dynamic linker for libc.  (Fixes Wine)
+bypassing the dynamic linker for libc (Fixes Wine).
+
+BUILDING: sh build.sh
+Should work more often than not.  If you want the ability for linking in dlsym
+by loading libdl.so, you should update the value of LIBDL_PATH in build.sh.
 
 USAGE: ./block_net_run.sh <program> [arguments]
 You can use the block_net_run.sh script, passing your program and arguments to
@@ -12,10 +16,14 @@ it, or you can set LD_PRELOAD yourself with:
 
 export LD_PRELOAD=/path/to/block_net/\$LIB/block_net.so
 
-To get a fully blocked shell.  The $LIB is necessary for multilib environments;
+to get a fully blocked shell.  The $LIB is necessary for multilib environments;
 make sure the $ is escaped so it's parsed by ld.so and not the shell.  You can
 select lib32 or lib64 specifically if you only want it to affect one or the
 other, or your system only has support for one of them.
+
+You can cause block_net to try to load in dlsym() directly from libdl.so.2 by
+setting the environment variable BN_NODEFAULT.  Make sure libdl.so.2 is in the
+set location.
 
 Problems:
 If a process uses dlvsym() directly to get the pointer to connect(), it will

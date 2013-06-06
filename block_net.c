@@ -14,7 +14,9 @@
 
 #include <netinet/in.h>
 
+#ifndef LIBDL_PATH
 #define LIBDL_PATH	"/lib/libdl.so.2"
+#endif
 
 #ifdef __LP64__
 #define GLIBC_VER	"GLIBC_2.2.5"
@@ -35,17 +37,25 @@ static void *libld;
 
 void * dlsym( void * handle, const char * symbol ) {
 	if(!dlsym_real) {
-		dlsym_real = dlvsym( RTLD_DEFAULT, "dlsym", GLIBC_VER );
-		if(!dlsym_real) {
-			if(!getenv("BN_SILENT"))
-				fprintf(stderr, "Attempted to find real dlsym() by loading libdl.so.\n");
-			libld = dlopen(LIBDL_PATH, RTLD_LAZY | RTLD_LOCAL);
-			if(!libld) {
+		if(getenv("BN_NODEFAULT")) {
+			if(!dlsym_real) {
 				if(!getenv("BN_SILENT"))
-					fprintf(stderr, "Failed to load libdl.so from " LIBDL_PATH "\n");
-				return NULL;
+					fprintf(stderr, "Attempted to find real dlsym() by loading libdl.so.\n");
+				libld = dlopen(LIBDL_PATH, RTLD_LAZY | RTLD_LOCAL);
+				if(!libld) {
+					if(!getenv("BN_SILENT"))
+						fprintf(stderr, "Failed to load libdl.so from " LIBDL_PATH "\n");
+					return NULL;
+				}
+				dlsym_real = dlvsym(libld, "dlsym", GLIBC_VER );
+				if(!dlsym_real) {
+					if(!getenv("BN_SILENT"))
+						fprintf(stderr, "Failed to find real dlsym().\n");
+					return NULL;
+				}
 			}
-			dlsym_real = dlvsym(libld, "dlsym", GLIBC_VER );
+		} else {
+			dlsym_real = dlvsym( RTLD_DEFAULT, "dlsym", GLIBC_VER );
 			if(!dlsym_real) {
 				if(!getenv("BN_SILENT"))
 					fprintf(stderr, "Failed to find real dlsym().\n");
