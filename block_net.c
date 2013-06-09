@@ -15,7 +15,11 @@
 #include <netinet/in.h>
 
 #ifndef LIBDL_PATH
-#define LIBDL_PATH	"/lib/libdl.so.2"
+#define LIBDL_PATH "/lib/libdl.so.2"
+#endif
+
+#ifndef LIBC_PATH
+#define LIBC_PATH "/lib/libc.so.6"
 #endif
 
 #ifdef __LP64__
@@ -33,55 +37,66 @@
 
 static void * (*dlsym_real)( void * handle, const char * symbol ) = NULL;
 static int (*connect_real)(int, const  struct sockaddr*, socklen_t) = NULL;
-static void *libld;
+static int silent = 0;
 
 void * dlsym( void * handle, const char * symbol ) {
+	if(silent == 0)
+		if(getenv("BN_SILENT"))
+			silent = 1;
+
 	if(!dlsym_real) {
 		if(getenv("BN_NODEFAULT")) {
+			fprintf(stderr, "balls\n");
+			dlsym_real = dlvsym(LIBDL_PATH, "dlsym", GLIBC_VER);
 			if(!dlsym_real) {
-				if(!getenv("BN_SILENT"))
-					fprintf(stderr, "Attempted to find real dlsym() by loading libdl.so.\n");
-				libld = dlopen(LIBDL_PATH, RTLD_LAZY | RTLD_LOCAL);
-				if(!libld) {
-					if(!getenv("BN_SILENT"))
-						fprintf(stderr, "Failed to load libdl.so from " LIBDL_PATH "\n");
-					return NULL;
-				}
-				dlsym_real = dlvsym(libld, "dlsym", GLIBC_VER );
-				if(!dlsym_real) {
-					if(!getenv("BN_SILENT"))
-						fprintf(stderr, "Failed to find real dlsym().\n");
-					return NULL;
-				}
+				if(silent == 0)
+					fprintf(stderr, "Failed to find real dlsym(), the application will probably fail.\n");
+				return(NULL);
 			}
 		} else {
-			dlsym_real = dlvsym( RTLD_DEFAULT, "dlsym", GLIBC_VER );
+			dlsym_real = dlvsym(RTLD_DEFAULT, "dlsym", GLIBC_VER);
 			if(!dlsym_real) {
-				if(!getenv("BN_SILENT"))
-					fprintf(stderr, "Failed to find real dlsym().\n");
-				return NULL;
+				if(silent == 0)
+					fprintf(stderr, "Failed to find real dlsym(), the application will probably fail.\n");
+				return(NULL);
 			}
 		}
 	}
 
 	if(!strncmp(symbol, "connect", 7))
-		return ( void * )connect;
+		return((void *)connect);
 
-	return dlsym_real( handle, symbol );
+	return(dlsym_real(handle, symbol));
 }
 
-int connect(int  sockfd,  const  struct sockaddr *serv_addr, socklen_t addrlen) {
+int connect(int sockfd, const struct sockaddr *serv_addr, socklen_t addrlen) {
+	if(silent == 0)
+		if(getenv("BN_SILENT"))
+			silent = 1;
+
 	if (!connect_real) {
-		connect_real=dlvsym(RTLD_DEFAULT, "connect", GLIBC_VER);
-		if(!connect_real) {
-			fprintf(stderr, "Failed to find real connect().\n");
-			errno = EACCES;
-			return(-1);
+		if(getenv("BN_NODEFAULT")) {
+			connect_real = dlvsym(LIBC_PATH, "connect", GLIBC_VER);
+			if(!connect_real) {
+				if(silent == 0)
+					fprintf(stderr, "Failed to find real connect(), the application will be unable to connect any sockets.\n");
+				errno = EACCES;
+				return(-1);
+			}
+		} else {
+			connect_real = dlvsym(RTLD_DEFAULT, "connect", GLIBC_VER);
+			if(!connect_real) {
+				if(silent == 0)
+					fprintf(stderr, "Failed to find real connect(), the application will be unable to connect any sockets.\n");
+				errno = EACCES;
+				return(-1);
+			}
 		}
 	}
 
 	if(!serv_addr) {
-		fprintf(stderr, "serv_addr is NULL?  Passing to connect() anyway.\n");
+		if(silent == 0)
+			fprintf(stderr, "serv_addr is NULL?  Passing to connect() anyway.\n");
 		return connect_real(sockfd, serv_addr, addrlen);
 	}
 
@@ -90,10 +105,10 @@ int connect(int  sockfd,  const  struct sockaddr *serv_addr, socklen_t addrlen) 
 	}
 
 	// Allow all contacts with localhost
-	if ((((struct sockaddr_in *)serv_addr)->sin_addr.s_addr & 0x000000FF) == 0x0000007F)
+	if((((struct sockaddr_in *)serv_addr)->sin_addr.s_addr & 0x000000FF) == 0x0000007F)
 		return connect_real(sockfd,serv_addr,addrlen);
 
-	if(!getenv("BN_SILENT"))
+	if(silent == 0)
 		fprintf(stderr,"connect() denied to address %X\n", ((struct sockaddr_in *)serv_addr)->sin_addr.s_addr);
 
 	errno = EACCES;
