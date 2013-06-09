@@ -35,28 +35,49 @@
 /* This definition is required to get dlvsym(). */
 #define _GNU_SOURCE
 
-static void * (*dlsym_real)( void * handle, const char * symbol ) = NULL;
-static int (*connect_real)(int, const  struct sockaddr*, socklen_t) = NULL;
-static int silent = 0;
+static void *(*dlsym_real)(void *handle, const char *symbol) = NULL;
+static int (*connect_real)(int, const struct sockaddr*, socklen_t) = NULL;
+static int silent = 2;
+static void *libdl, *libc;
 
-void * dlsym( void * handle, const char * symbol ) {
-	if(silent == 0)
+void *dlsym(void *handle, const char *symbol) {
+	if(silent == 2) {
 		if(getenv("BN_SILENT"))
+			silent = 0;
+		else
 			silent = 1;
+	}
 
 	if(!dlsym_real) {
 		if(getenv("BN_NODEFAULT")) {
-			fprintf(stderr, "balls\n");
-			dlsym_real = dlvsym(LIBDL_PATH, "dlsym", GLIBC_VER);
-			if(!dlsym_real) {
-				if(silent == 0)
-					fprintf(stderr, "Failed to find real dlsym(), the application will probably fail.\n");
-				return(NULL);
+			if(getenv("BN_LIBDL_PATH"))
+				libdl = dlopen(getenv("BN_LIBDL_PATH"), RTLD_LAZY);
+			else
+				libdl = dlopen(LIBDL_PATH, RTLD_LAZY);
+			if(libdl) {
+				dlsym_real = dlvsym(libdl, "dlsym", GLIBC_VER);
+				if(!dlsym_real) {
+					if(silent != 0) {
+						if(getenv("BN_LIBDL_PATH"))
+							fprintf(stderr, "Failed to load real dlsym() from %s, the application will probably fail.\n",
+							        getenv("BN_LIBDL_PATH"));
+						else
+							fprintf(stderr, "Failed to load real dlsym() from " LIBDL_PATH ", the application will probably fail.\n");
+					}
+					return(NULL);
+				}
+			} else {
+				if(silent != 0) {
+					if(getenv("BN_LIBDL_PATH"))
+						fprintf(stderr, "Failed to open %s, the application will probably fail.\n", getenv("BN_LIBDL_PATH"));
+					else
+						fprintf(stderr, "Failed to open " LIBDL_PATH ", the application will probably fail\n");
+				}
 			}
 		} else {
 			dlsym_real = dlvsym(RTLD_DEFAULT, "dlsym", GLIBC_VER);
 			if(!dlsym_real) {
-				if(silent == 0)
+				if(silent != 0)
 					fprintf(stderr, "Failed to find real dlsym(), the application will probably fail.\n");
 				return(NULL);
 			}
@@ -70,18 +91,39 @@ void * dlsym( void * handle, const char * symbol ) {
 }
 
 int connect(int sockfd, const struct sockaddr *serv_addr, socklen_t addrlen) {
-	if(silent == 0)
+	if(silent == 2) {
 		if(getenv("BN_SILENT"))
+			silent = 0;
+		else
 			silent = 1;
+	}
 
 	if (!connect_real) {
 		if(getenv("BN_NODEFAULT")) {
-			connect_real = dlvsym(LIBC_PATH, "connect", GLIBC_VER);
-			if(!connect_real) {
-				if(silent == 0)
-					fprintf(stderr, "Failed to find real connect(), the application will be unable to connect any sockets.\n");
-				errno = EACCES;
-				return(-1);
+			if(getenv("BN_LIBC_PATH"))
+				libc = dlopen(getenv("BN_LIBC_PATH"), RTLD_LAZY);
+			else
+				libc = dlopen(LIBC_PATH, RTLD_LAZY);
+			if(libdl) {
+				connect_real = dlvsym(libc, "connect", GLIBC_VER);
+				if(!connect_real) {
+					if(silent != 0) {
+						if(getenv("BN_LIBC_PATH"))
+							fprintf(stderr, "Failed to load real connect() from %s, the application will probably fail.\n",
+							        getenv("BN_LIBC_PATH"));
+						else
+							fprintf(stderr, "Failed to load real connect() from " LIBC_PATH ", the application will probably fail.\n");
+					}
+					errno = EACCES;
+					return(-1);
+				}
+			} else {
+				if(silent != 0) {
+					if(getenv("BN_LIBC_PATH"))
+						fprintf(stderr, "Failed to open %s, the application will probably fail.\n", getenv("BN_LIBC_PATH"));
+					else
+						fprintf(stderr, "Failed to open " LIBC_PATH ", the application will probably fail\n");
+				}
 			}
 		} else {
 			connect_real = dlvsym(RTLD_DEFAULT, "connect", GLIBC_VER);

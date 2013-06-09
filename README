@@ -1,4 +1,6 @@
-block_net libc connect() wrapper
+----------------------------------------
+||| block_net libc connect() wrapper |||
+----------------------------------------
 
 Uses LD_PRELOAD to wrap connect() to prevent access to the internet.  Access is
 allowed to 127.0.0.0/8 and all other services but IPv4 are passed straight
@@ -6,11 +8,19 @@ through.  (I don't have any IPv6 support where I am now so I have no real way
 to develop this.)  Additionally, dlsym() is wrapped to prevent a process
 bypassing the dynamic linker for libc (Fixes Wine).
 
-BUILDING: sh build.sh
-Should work more often than not.  If you want the ability for linking in dlsym
-by loading libdl.so, you should update the value of LIBDL_PATH in build.sh.
+--- BUILDING ---
 
-USAGE: ./block_net_run.sh <program> [arguments]
+sh build.sh
+
+Should work more often than not.  If you want the ability for linking in dlsym
+by loading libdl.so, you should update the value of LIBDL_PATH and LIBC_PATH in
+build.sh.
+
+
+--- USAGE ---
+
+./block_net_run.sh <program> [arguments]
+
 You can use the block_net_run.sh script, passing your program and arguments to
 it, or you can set LD_PRELOAD yourself with:
 
@@ -21,20 +31,35 @@ make sure the $ is escaped so it's parsed by ld.so and not the shell.  You can
 select lib32 or lib64 specifically if you only want it to affect one or the
 other, or your system only has support for one of them.
 
-You can cause block_net to try to load in dlsym() directly from libdl.so.2 by
-setting the environment variable BN_NODEFAULT.  Make sure libdl.so.2 is in the
-set location.
+You can cause block_net to try to load in dlsym() directly from libdl.so and
+connect() from libc.so by setting the environment variable BN_NODEFAULT.  Make
+sure libdl.so and libc.so are in the set locations.
 
-Problems:
+
+--- PROBLEMS ---
+
 If a process uses dlvsym() directly to get the pointer to connect(), it will
 bypass LD_PRELOAD and the dlsym() protection.  If anyone has any hints to a
 solution for this, I would like to know.
 
 ncurses programs may get a screwed up terminal at times, you can get around
-this by setting BN_SILENT in your environment, value doesn't matter.  The
-tradeoff is this reduces stealth.
+this by setting BN_SILENT in your environment, value doesn't matter.
 
 A process may be able to unset or detect the presence of LD_PRELOAD to
 circumvent this library.  Again, hints on this would be helpful.
 
 Not endian-safe (little-endian only).  Might fix if there's demand for it.
+
+Environment variable configuration reduces stealth.  Might switch to a file
+based config if there's demand for it.
+
+
+--- ENVIRONMENT VARIABLES ---
+
+BN_SILENT       Set to anything to inhibit all output.
+
+BN_NODEFAULT    Don't use default path to LIBC/LIBDL.
+
+BN_LIBDL_PATH   Override libdl.so path for BN_NODEFAULT.
+
+BN_LIBC_PATH    Override libc.so path for BN_NODEFAULT.
