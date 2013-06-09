@@ -53,6 +53,9 @@ Not endian-safe (little-endian only).  Might fix if there's demand for it.
 Environment variable configuration reduces stealth.  Might switch to a file
 based config if there's demand for it.
 
+Potentially possible for a process to use a static linked libc or use kernel
+services directly.
+
 
 --- ENVIRONMENT VARIABLES ---
 
